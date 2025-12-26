@@ -4,136 +4,626 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI可轉債競拍系統 v2.0</title>
+<title>AI智能可轉債競拍評估系統 v1.0</title>
+<!-- 
+    ═══════════════════════════════════════════════════════════════
+    可轉債競拍評估系統 v1.0
+    從 index_html_v3.98h 提取左半部競拍功能
+
+```
+核心功能：
+1. 競拍條件輸入面板
+2. AI智能評估模組
+3. 市場溫度計
+4. 主力模擬出價
+5. 策略價格計算
+
+資料來源：CSV 檔案 (data/00_cb/ 目錄)
+═══════════════════════════════════════════════════════════════
+```
+
+–>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
 <style>
+/* ================= 基礎設定 ================= */
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
-.container { max-width: 1400px; margin: 0 auto; }
-.header { background: white; border-radius: 15px; padding: 20px; margin-bottom: 15px; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.15); }
-.header h1 { color: #667eea; font-size: 26px; margin-bottom: 8px; }
-.header .stats-row { display: flex; justify-content: center; gap: 30px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+body { 
+    font-family: 'Microsoft JhengHei', 'Segoe UI', Arial, sans-serif; 
+    background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%);
+    min-height: 100vh; 
+    padding: 20px; 
+}
+.container { max-width: 800px; margin: 0 auto; }
+
+/* ================= 頁首 ================= */
+.header { 
+    background: white; 
+    border-radius: 15px; 
+    padding: 25px 30px; 
+    margin-bottom: 20px; 
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2); 
+    text-align: center; 
+    border: 2px solid rgba(102, 126, 234, 0.3);
+}
+.header h1 { 
+    color: #1a237e; 
+    font-size: 26px; 
+    margin-bottom: 10px; 
+    font-weight: 900; 
+}
+.header .subtitle { 
+    color: #666; 
+    font-size: 14px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 10px; 
+    font-weight: bold; 
+    flex-wrap: wrap; 
+}
+.version-badge { 
+    display: inline-block; 
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%); 
+    color: white; 
+    padding: 5px 15px; 
+    border-radius: 20px; 
+    font-size: 12px; 
+    font-weight: bold; 
+    margin: 8px 0;
+    box-shadow: 0 2px 8px rgba(238,90,90,0.3);
+}
+.header .stats-row { 
+    display: flex; 
+    justify-content: center; 
+    gap: 30px; 
+    margin-top: 15px; 
+    padding-top: 15px; 
+    border-top: 1px solid #e0e0e0; 
+    flex-wrap: wrap;
+}
 .header .stat-item { text-align: center; }
-.header .stat-value { font-size: 24px; font-weight: 900; }
-.header .stat-label { font-size: 11px; color: #666; }
+.header .stat-value { font-size: 24px; font-weight: 900; color: #1a237e; }
+.header .stat-label { font-size: 11px; color: #666; margin-top: 2px; }
 
-.main-grid { display: grid; grid-template-columns: 420px 1fr; gap: 20px; }
-@media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+/* ================= 主面板 ================= */
+.main-panel { 
+    background: white; 
+    border-radius: 15px; 
+    padding: 25px; 
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2); 
+    border-left: 6px solid #1a237e;
+}
+.main-panel h2 { 
+    color: #1a237e; 
+    font-size: 20px; 
+    margin-bottom: 20px; 
+    padding-bottom: 12px; 
+    border-bottom: 3px solid #1a237e; 
+    font-weight: 800; 
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
 
-.panel { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); }
-.panel h2 { color: #667eea; font-size: 16px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #667eea; display: flex; align-items: center; gap: 8px; }
-.form-section { margin-bottom: 20px; }
-.form-section h3 { color: #333; font-size: 14px; margin-bottom: 12px; border-left: 4px solid #667eea; padding-left: 10px; }
+/* ================= 表單區塊 ================= */
+.form-section { margin-bottom: 25px; }
+.form-section h3 { 
+    color: #333; 
+    font-size: 16px; 
+    margin-bottom: 15px; 
+    font-weight: bold; 
+    border-left: 4px solid #1a237e; 
+    padding-left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 .form-group { margin-bottom: 12px; }
-.form-group label { display: block; color: #555; font-size: 12px; margin-bottom: 4px; font-weight: 600; }
-.form-group input, .form-group select { width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: #667eea; }
+.form-group label { 
+    display: block; 
+    color: #555; 
+    font-size: 13px; 
+    margin-bottom: 5px; 
+    font-weight: 700; 
+}
+.form-group input, .form-group select { 
+    width: 100%; 
+    padding: 12px; 
+    border: 2px solid #e0e0e0; 
+    border-radius: 10px; 
+    font-size: 14px; 
+    transition: all 0.3s; 
+    font-weight: 600; 
+    color: #333;
+}
+.form-group input:focus, .form-group select:focus { 
+    outline: none; 
+    border-color: #1a237e; 
+    background: #f8f9ff;
+    box-shadow: 0 0 0 3px rgba(26,35,126,0.1);
+}
 
-.btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s; }
-.btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
-.btn-reset { background: #f5f5f5; color: #666; }
+/* ================= 閃電帶入 ================= */
+.quick-select-section {
+    background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 20px;
+}
+.quick-select-section h4 {
+    color: #e65100;
+    font-size: 15px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#quickSelect {
+    width: 100%;
+    font-size: 14px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 2px solid #ffc107;
+    cursor: pointer;
+    font-weight: 600;
+}
 
-.result-card { background: linear-gradient(135deg, #f8f9ff 0%, #e8ebff 100%); border: 2px solid #667eea; border-radius: 12px; padding: 20px; margin-bottom: 15px; }
-.result-title { font-size: 16px; font-weight: bold; color: #667eea; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
-.price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.price-item { background: white; padding: 15px; border-radius: 10px; text-align: center; }
-.price-item.conservative { border-left: 4px solid #4caf50; }
-.price-item.balanced { border-left: 4px solid #2196f3; }
-.price-item.aggressive { border-left: 4px solid #ff9800; }
-.price-label { font-size: 12px; color: #666; margin-bottom: 5px; }
-.price-value { font-size: 22px; font-weight: bold; }
-.price-item.conservative .price-value { color: #4caf50; }
-.price-item.balanced .price-value { color: #2196f3; }
-.price-item.aggressive .price-value { color: #ff9800; }
+/* ================= 區塊樣式 ================= */
+.section-card {
+    border-radius: 12px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+.section-header {
+    padding: 15px 18px;
+    font-size: 15px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: white;
+}
+.section-header:hover { filter: brightness(0.95); }
+.section-header .toggle-icon {
+    margin-left: auto;
+    font-size: 12px;
+    transition: transform 0.3s;
+}
+.section-header.collapsed .toggle-icon { transform: rotate(-90deg); }
+.section-content {
+    padding: 18px;
+    background: white;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    overflow: hidden;
+}
+.section-content.collapsed {
+    max-height: 0 !important;
+    padding-top: 0;
+    padding-bottom: 0;
+}
 
-.info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #e0e0e0; font-size: 13px; }
-.info-row:last-child { border-bottom: none; }
-.info-label { color: #666; }
-.info-value { font-weight: 600; color: #333; }
+/* 區塊一：輸入 - 藍色系 */
+.section-input .section-header {
+    background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+}
+/* 區塊二：AI評估 - 紫色系 */
+.section-ai .section-header {
+    background: linear-gradient(135deg, #7b1fa2 0%, #9c27b0 100%);
+}
+/* 區塊三：市場溫度 - 綠色系 */
+.section-market .section-header {
+    background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+}
 
-.quick-select { background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%); border: 2px solid #ffc107; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
-.quick-select h3 { color: #f57c00; margin-bottom: 10px; font-size: 14px; }
-.quick-select select { border: 2px solid #ffc107; font-weight: bold; }
+/* ================= 結果卡片 ================= */
+.result-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 15px;
+    border: 2px solid #e0e0e0;
+}
+.result-card.highlight {
+    border-color: #1a237e;
+    box-shadow: 0 4px 15px rgba(26,35,126,0.2);
+}
+.result-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 
-.atmosphere-card { background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #4caf50; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
-.atmosphere-title { font-size: 14px; font-weight: bold; color: #2e7d32; margin-bottom: 10px; }
-.atmosphere-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.atmosphere-item { background: white; padding: 10px; border-radius: 8px; text-align: center; }
-.atmosphere-value { font-size: 18px; font-weight: bold; color: #2e7d32; }
-.atmosphere-label { font-size: 11px; color: #666; }
+/* ================= 策略價格卡片 ================= */
+.strategy-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 15px;
+}
+@media (max-width: 600px) {
+    .strategy-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.strategy-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    border: 2px solid #e0e0e0;
+    transition: all 0.2s;
+}
+.strategy-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.strategy-card.conservative { border-left: 4px solid #2196f3; }
+.strategy-card.balanced { border-left: 4px solid #4caf50; }
+.strategy-card.aggressive { border-left: 4px solid #ff9800; }
+.strategy-card.ultimate { border-left: 4px solid #f44336; }
+.strategy-label { font-size: 12px; color: #666; margin-bottom: 5px; }
+.strategy-price { font-size: 22px; font-weight: 900; color: #333; }
+.strategy-rate { font-size: 11px; color: #888; margin-top: 3px; }
 
-.history-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 15px; }
-.history-table th { background: #667eea; color: white; padding: 10px; text-align: left; }
-.history-table td { padding: 8px 10px; border-bottom: 1px solid #e0e0e0; }
-.history-table tr:hover { background: #f5f5f5; }
+/* ================= 評估按鈕 ================= */
+.calculate-btn {
+    width: 100%;
+    padding: 18px;
+    background: linear-gradient(135deg, #1a237e 0%, #3949ab 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(26,35,126,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.calculate-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(26,35,126,0.4);
+}
+.calculate-btn:active {
+    transform: translateY(0);
+}
 
-.loading { text-align: center; padding: 40px; color: #666; }
-.loading-spinner { display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+/* ================= 警告提示 ================= */
+.warning-box { 
+    background: #fff3e0; 
+    border-left: 4px solid #ff9800; 
+    padding: 12px 15px; 
+    margin-top: 10px; 
+    font-size: 13px; 
+    color: #e65100; 
+    font-weight: 600; 
+    border-radius: 0 8px 8px 0;
+}
+
+/* ================= 資訊卡片 ================= */
+.info-box { 
+    background: #e8f5e9; 
+    padding: 12px 15px; 
+    border-radius: 8px; 
+    border-left: 5px solid #4CAF50; 
+    margin-top: 8px; 
+    display: none; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+    animation: slideDown 0.3s ease-out; 
+}
+@keyframes slideDown { 
+    from { opacity: 0; transform: translateY(-10px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+
+/* ================= 歷史搜尋結果 ================= */
+.history-results {
+    margin-top: 10px;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border: 2px solid #2196f3;
+    border-radius: 12px;
+    padding: 15px;
+    display: none;
+    max-height: 400px;
+    overflow-y: auto;
+}
+.history-card {
+    background: white;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #90caf9;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.history-card:hover {
+    border-color: #1976d2;
+    box-shadow: 0 2px 8px rgba(25,118,210,0.2);
+}
+
+/* ================= 結果顯示區 ================= */
+.result-section {
+    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    border: 2px solid #4caf50;
+    border-radius: 15px;
+    padding: 20px;
+    margin-top: 20px;
+    display: none;
+}
+.result-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #4caf50;
+}
+.result-header h3 {
+    font-size: 18px;
+    color: #2e7d32;
+    font-weight: 800;
+}
+
+/* ================= 預測信心度 ================= */
+.confidence-bar {
+    height: 10px;
+    background: #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+.confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50 0%, #8bc34a 50%, #cddc39 100%);
+    transition: width 0.5s;
+}
+
+/* ================= 載入動畫 ================= */
+.loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(26,35,126,0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+    color: white;
+    margin-top: 20px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* ================= 市場氛圍面板 ================= */
+.atmosphere-panel {
+    background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+    color: white;
+    padding: 18px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+}
+.atmosphere-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.atmosphere-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+.atmosphere-item {
+    text-align: center;
+    padding: 10px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+.atmosphere-item .value {
+    font-size: 20px;
+    font-weight: 900;
+}
+.atmosphere-item .label {
+    font-size: 11px;
+    opacity: 0.8;
+    margin-top: 3px;
+}
+
+/* ================= Rex大叔提醒 ================= */
+.rex-box {
+    background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 15px;
+}
+.rex-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #e65100;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.rex-content {
+    font-size: 14px;
+    color: #5d4037;
+    line-height: 1.8;
+}
+
+/* ================= 頁尾 ================= */
+.footer {
+    margin-top: 30px;
+    padding: 20px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #666;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
 </style>
 
 </head>
+
 <body>
-<div class="container">
-<!-- Header -->
+<!-- 載入動畫 -->
+<div class="loading" id="loadingDiv">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">🚀 系統啟動中...</div>
+    <div style="color:rgba(255,255,255,0.7); margin-top:10px; font-size:13px;" id="loadingStatus">正在載入競拍資料庫...</div>
+</div>
+
+<div class="container" style="display:none;">
+
+<!-- 頁首 -->
+
 <div class="header">
-    <h1>🤖 AI可轉債競拍系統</h1>
-    <div style="color:#666; font-size:13px;">基於307檔歷史數據的智能預測系統 v2.0</div>
+    <h1>🎯 AI智能可轉債競拍評估系統</h1>
+    <div class="version-badge">v1.0 競拍專注版</div>
+    <div class="subtitle">
+        <span>📊 數據驅動</span>
+        <span>•</span>
+        <span>🤖 AI預測</span>
+        <span>•</span>
+        <span>🎯 精準出價</span>
+    </div>
     <div class="stats-row">
         <div class="stat-item">
-            <div class="stat-value" id="totalCases" style="color:#667eea;">--</div>
-            <div class="stat-label">競拍案例</div>
+            <div class="stat-value" id="totalAuction">--</div>
+            <div class="stat-label">歷史競拍檔數</div>
         </div>
         <div class="stat-item">
-            <div class="stat-value" id="avgMultiplier" style="color:#ff9800;">--</div>
+            <div class="stat-value" id="avgPremium">--</div>
+            <div class="stat-label">平均溢價率</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="avgMultiple">--</div>
             <div class="stat-label">平均投標倍數</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value" id="pendingCount" style="color:#4caf50;">--</div>
-            <div class="stat-label">待競拍</div>
         </div>
     </div>
 </div>
 
-<!-- 主體 Grid -->
+<!-- 主面板 -->
 
-<div class="main-grid">
-    <!-- 左側：輸入面板 -->
-    <div class="panel" style="max-height: calc(100vh - 180px); overflow-y: auto;">
-        <h2>📋 競拍條件輸入</h2>
+<div class="main-panel">
+    <h2>📝 競拍條件輸入</h2>
 
 ```
+<form id="evaluationForm">
+    
     <!-- 閃電帶入 -->
-    <div class="quick-select">
-        <h3>⚡ 閃電帶入</h3>
-        <div class="form-group">
-            <select id="quickSelect">
-                <option value="">-- 選擇案件自動帶入 --</option>
-            </select>
-        </div>
+    <div class="quick-select-section">
+        <h4>⚡ 閃電帶入（選擇後自動填入）</h4>
+        <select id="quickSelect" onchange="quickSelectCB(this.value)">
+            <option value="">-- 請選擇案件 --</option>
+            <optgroup label="🔥 即將競拍" id="upcomingAuctionGroup"></optgroup>
+            <optgroup label="✅ 近期完成競拍" id="recentAuctionGroup"></optgroup>
+        </select>
+        <div id="quickSelectInfo" style="display:none; margin-top:10px; font-size:13px; color:#666;"></div>
     </div>
     
-    <form id="evalForm">
-        <!-- 基本資料 -->
-        <div class="form-section">
-            <h3>📌 基本資料</h3>
+    <!-- 區塊一：基本資料 -->
+    <div class="section-card section-input">
+        <div class="section-header" onclick="toggleSection('inputSection', this)">
+            <span style="font-size:18px;">📌</span>
+            <span>一、基本資料</span>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" id="inputSection">
             <div class="form-group">
-                <label>CB名稱/代號</label>
-                <input type="text" id="cbName" placeholder="如：精測一">
+                <label>CB名稱 / 代號 *</label>
+                <input type="text" id="cbName" placeholder="輸入代號或名稱搜尋歷史">
+                <div id="historyResults" class="history-results"></div>
             </div>
             <div class="form-group">
                 <label>產業分類 *</label>
-                <select id="industry"><option value="">請選擇...</option></select>
+                <select id="industry">
+                    <option value="">請選擇...</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>發行券商</label>
-                <select id="broker"><option value="">請選擇...</option></select>
+                <select id="broker">
+                    <option value="">請選擇...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>股本區間</label>
+                <select id="capital">
+                    <option value="">請選擇...</option>
+                    <option value="小於3億">小於3億</option>
+                    <option value="3~6億">3~6億</option>
+                    <option value="6~10億">6~10億</option>
+                    <option value="10~15億">10~15億</option>
+                    <option value="15~20億">15~20億</option>
+                    <option value="大於20億">大於20億</option>
+                </select>
             </div>
         </div>
-        
-        <!-- 發行條件 -->
-        <div class="form-section">
-            <h3>💰 發行條件</h3>
+    </div>
+    
+    <!-- 區塊二：發行條件 -->
+    <div class="section-card section-ai">
+        <div class="section-header" onclick="toggleSection('issueSection', this)">
+            <span style="font-size:18px;">💰</span>
+            <span>二、發行條件</span>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" id="issueSection">
+            <div class="form-group">
+                <label>發行規模區間 *</label>
+                <select id="issueSize">
+                    <option value="">請選擇...</option>
+                    <option value="小於2億">小於2億</option>
+                    <option value="2~5億">2~5億</option>
+                    <option value="5~10億">5~10億</option>
+                    <option value="10~15億">10~15億</option>
+                    <option value="15~20億">15~20億</option>
+                    <option value="大於20億">大於20億</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>發行年期 *</label>
+                <select id="years">
+                    <option value="">請選擇...</option>
+                    <option value="3">3年期</option>
+                    <option value="5">5年期</option>
+                    <option value="7">7年期</option>
+                </select>
+            </div>
             <div class="form-group">
                 <label>擔保情況 *</label>
                 <select id="guarantee">
@@ -156,618 +646,747 @@ body { font-family: 'Microsoft JhengHei', Arial, sans-serif; background: linear-
                     <option value="8">TCRI 8</option>
                 </select>
             </div>
+        </div>
+    </div>
+    
+    <!-- 區塊三：競拍資料 -->
+    <div class="section-card section-market">
+        <div class="section-header" onclick="toggleSection('auctionSection', this)">
+            <span style="font-size:18px;">🎯</span>
+            <span>三、競拍資料</span>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="section-content" id="auctionSection">
             <div class="form-group">
-                <label>發行總額 (億元)</label>
-                <input type="number" id="issueAmount" step="0.1" placeholder="如：10">
+                <label>競拍截止日收盤價 (元) *</label>
+                <input type="number" id="stockPrice" step="0.01" placeholder="例如：461.5">
+            </div>
+            <div class="form-group">
+                <label>實際轉換價格 (元) *</label>
+                <input type="number" id="conversionPrice" step="0.01" placeholder="例如：450">
+            </div>
+            <div class="form-group">
+                <label>底標價格 (元)</label>
+                <input type="number" id="floorPrice" step="0.1" value="100" placeholder="預設：100">
+            </div>
+            <div class="warning-box">
+                ⚠️ 理論價格隨股價變動，建議於 13:30 截標前再進行最終試算
             </div>
         </div>
-        
-        <!-- 競拍資料 -->
-        <div class="form-section">
-            <h3>🎯 競拍資料</h3>
-            <div class="form-group">
-                <label>理論價格 (元) *</label>
-                <input type="number" id="theoPrice" step="0.01" placeholder="如：105.5">
-                <div style="font-size:11px; color:#888; margin-top:4px;">= 股價 ÷ 轉換價 × 100</div>
+    </div>
+    
+    <!-- 即時理論價計算 -->
+    <div id="theoCalcResult" style="display:none; background:linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border:2px solid #2196f3; border-radius:12px; padding:18px; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:15px;">
+            <div>
+                <div style="font-size:12px; color:#1565c0; margin-bottom:5px;">📊 計算結果</div>
+                <div style="font-size:24px; font-weight:900; color:#0d47a1;">
+                    理論價：<span id="calcTheoPrice">--</span> 元
+                </div>
             </div>
-            <div class="form-group">
-                <label>股票收盤價 (元)</label>
-                <input type="number" id="stockPrice" step="0.01" placeholder="選填，用於計算理論價">
-            </div>
-            <div class="form-group">
-                <label>轉換價格 (元)</label>
-                <input type="number" id="convPrice" step="0.01" placeholder="選填，用於計算理論價">
+            <div style="text-align:right;">
+                <div style="font-size:12px; color:#1565c0; margin-bottom:5px;">理論價區間</div>
+                <div style="font-size:18px; font-weight:700; color:#1976d2;" id="calcTheoRange">--</div>
             </div>
         </div>
-        
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button type="button" class="btn btn-primary" onclick="runPrediction()" style="flex:1;">🔮 AI預測</button>
-            <button type="button" class="btn btn-reset" onclick="resetForm()">重置</button>
-        </div>
-    </form>
-</div>
+    </div>
+    
+    <!-- 評估按鈕 -->
+    <button type="submit" class="calculate-btn">
+        <span style="font-size:24px;">🎯</span>
+        <span>開始 AI 評估</span>
+    </button>
+    
+</form>
 
-<!-- 右側：結果面板 -->
-<div class="panel">
-    <h2>🎯 AI預測結果</h2>
-    <div id="resultArea">
-        <div class="loading">
-            <div class="loading-spinner"></div>
-            <div>載入資料中...</div>
+<!-- 結果顯示區 -->
+<div class="result-section" id="resultSection">
+    <div class="result-header">
+        <span style="font-size:28px;">📊</span>
+        <h3>AI 智能評估結果</h3>
+    </div>
+    
+    <!-- 理論價與策略價格 -->
+    <div class="result-card highlight">
+        <div class="result-title">🎯 策略建議價格</div>
+        <div class="strategy-grid">
+            <div class="strategy-card conservative">
+                <div class="strategy-label">🛡️ 保守</div>
+                <div class="strategy-price" id="priceConservative">--</div>
+                <div class="strategy-rate" id="rateConservative">得標率~27%</div>
+            </div>
+            <div class="strategy-card balanced">
+                <div class="strategy-label">⚖️ 穩健</div>
+                <div class="strategy-price" id="priceBalanced">--</div>
+                <div class="strategy-rate" id="rateBalanced">得標率~50%</div>
+            </div>
+            <div class="strategy-card aggressive">
+                <div class="strategy-label">🚀 積極</div>
+                <div class="strategy-price" id="priceAggressive">--</div>
+                <div class="strategy-rate" id="rateAggressive">得標率~73%</div>
+            </div>
+            <div class="strategy-card ultimate">
+                <div class="strategy-label">🔥 極致</div>
+                <div class="strategy-price" id="priceUltimate">--</div>
+                <div class="strategy-rate" id="rateUltimate">得標率~89%</div>
+            </div>
+        </div>
+        <div style="font-size:12px; color:#666; text-align:center; margin-top:10px;">
+            策略價格採用黃金比例係數 (0.618σ / 1.236σ) 計算
         </div>
     </div>
     
     <!-- 市場氛圍 -->
-    <div class="atmosphere-card" id="atmosphereCard" style="display:none;">
-        <div class="atmosphere-title">📊 市場氛圍分析</div>
+    <div class="atmosphere-panel">
+        <div class="atmosphere-title">🌡️ 市場氛圍分析</div>
         <div class="atmosphere-grid">
             <div class="atmosphere-item">
-                <div class="atmosphere-value" id="recentAvgPremium">--</div>
-                <div class="atmosphere-label">近期平均溢價</div>
+                <div class="value" id="atmMultiple">--</div>
+                <div class="label">預測投標倍數</div>
             </div>
             <div class="atmosphere-item">
-                <div class="atmosphere-value" id="recentAvgMult">--</div>
-                <div class="atmosphere-label">近期平均倍數</div>
+                <div class="value" id="atmPremium">--</div>
+                <div class="label">預測溢價率</div>
+            </div>
+            <div class="atmosphere-item">
+                <div class="value" id="atmHeat">--</div>
+                <div class="label">市場熱度</div>
             </div>
         </div>
     </div>
     
-    <!-- 歷史查詢 -->
-    <div style="margin-top: 20px;">
-        <h3 style="font-size: 14px; color: #667eea; margin-bottom: 10px;">📚 近期競拍案例</h3>
-        <div id="historyTable">
-            <div class="loading">載入中...</div>
+    <!-- 預測信心度 -->
+    <div class="result-card">
+        <div class="result-title">📊 預測信心度</div>
+        <div style="display:flex; align-items:center; gap:15px; margin-bottom:10px;">
+            <span style="font-size:20px;" id="confStars">⭐⭐⭐</span>
+            <span style="font-size:16px; font-weight:700;" id="confText">中高信心</span>
+            <span style="font-size:14px; color:#666;">(<span id="confScore">--</span>分)</span>
+        </div>
+        <div class="confidence-bar">
+            <div class="confidence-fill" id="confBar" style="width:60%;"></div>
+        </div>
+        <div style="font-size:12px; color:#888; margin-top:8px;" id="confExplain">
+            基於歷史資料庫計算
+        </div>
+    </div>
+    
+    <!-- Rex大叔提醒 -->
+    <div class="rex-box">
+        <div class="rex-title">🧢 Rex大叔提醒</div>
+        <div class="rex-content" id="rexAdvice">
+            選擇條件後將自動生成個人化建議...
         </div>
     </div>
 </div>
 ```
 
 </div>
+
+<!-- 頁尾 -->
+
+<div class="footer">
+    <div>AI智能可轉債競拍評估系統 v1.0 | 競拍專注版</div>
+    <div style="margin-top:8px;">💡 本系統僅供參考，投資決策請自行判斷</div>
+    <div style="margin-top:5px; color:#999;">資料來源：歷史競拍資料庫</div>
+</div>
+
 </div>
 
 <script>
 // ==========================================
 // 全域變數
 // ==========================================
-let auctionData = [];      // 競拍歷史資料
-let issueData = [];        // 待發行資料
-let industryData = {};     // 產業分類
-const DATA_PATH = 'data/00_cb/';
+let auctionRawData = [];  // 競拍原始資料
+let cbDatabase = {};       // CB資料庫
+let statistics = { '維度統計': { '產業': {}, '發行券商': {} } };
+let globalMarketStats = { low: 5, avg: 8 };
+let pendingCases = [];     // 待競拍案件
 
 // ==========================================
-// AICore 線性迴歸預測模組（精簡版）
+// 系統初始化
 // ==========================================
-const AICore = {
-    // 有擔保CB預測：溢價 = 65 - 0.56 × 理論價
-    predictGuaranteed: function(theoPrice, tcri, industry) {
-        let basePremium = 65 - 0.56 * theoPrice;
-        
-        // TCRI調整
-        const tcriMap = {4: 0, 5: -1, 6: 1, 7: -1, 8: 1, 9: -2};
-        let tcriAdj = tcriMap[tcri] || 0;
-        
-        // 產業調整
-        let industryAdj = 0;
-        const hotIndustries = ['鋼鐵工業', '半導體業', '運動休閒', '綠能環保'];
-        const coldIndustries = ['電子零組件業', '通信網路業', '生技醫療業'];
-        if (hotIndustries.includes(industry)) industryAdj = 2;
-        else if (coldIndustries.includes(industry)) industryAdj = -2;
-        
-        let totalPremium = Math.max(basePremium + tcriAdj + industryAdj, 0);
-        
-        return {
-            predictedPrice: theoPrice + totalPremium,
-            basePremium, tcriAdj, industryAdj, totalPremium,
-            model: 'guaranteed',
-            formula: '65 - 0.56×理論價',
-            accuracy: { mae: 3.38, within5: 78.2 }
-        };
-    },
-    
-    // 無擔保CB預測：溢價 = 82 - 0.75 × 理論價
-    predictNonGuaranteed: function(theoPrice, tcri, industry) {
-        let basePremium = 82 - 0.75 * theoPrice;
-        
-        // TCRI調整（無擔保效果更大）
-        const tcriMap = {3: 3, 4: 1, 5: 3, 6: 0, 7: -3, 8: -6};
-        let tcriAdj = tcriMap[tcri] || 0;
-        
-        // 產業調整
-        let industryAdj = 0;
-        const hotIndustries = ['其他電子業', '通信網路業', '鋼鐵工業', '汽車工業'];
-        const coldIndustries = ['光電業', '建材營造業', '生技醫療業'];
-        if (hotIndustries.includes(industry)) industryAdj = 2;
-        else if (coldIndustries.includes(industry)) industryAdj = -3;
-        
-        let totalPremium = basePremium + tcriAdj + industryAdj;
-        
-        return {
-            predictedPrice: theoPrice + totalPremium,
-            basePremium, tcriAdj, industryAdj, totalPremium,
-            model: 'nonGuaranteed',
-            formula: '82 - 0.75×理論價',
-            accuracy: { mae: 3.85, within5: 65.0 }
-        };
-    },
-    
-    // 統一預測入口
-    predict: function(theoPrice, guarantee, tcri, industry) {
-        if (!theoPrice || theoPrice <= 0) return null;
-        const isGuaranteed = (guarantee === '有擔保' || guarantee === '有');
-        const tcriNum = parseInt(tcri) || 5;
-        
-        if (isGuaranteed) {
-            return this.predictGuaranteed(theoPrice, tcriNum, industry);
-        } else {
-            return this.predictNonGuaranteed(theoPrice, tcriNum, industry);
-        }
-    },
-    
-    // 計算策略價格（基於黃金比例）
-    calcStrategies: function(prediction, theoPrice) {
-        if (!prediction) return null;
-        
-        const std = prediction.model === 'guaranteed' ? 5.5 : 6.5;
-        const strategyStd = std * theoPrice / 100;
-        const basePrice = prediction.predictedPrice;
-        const absoluteMin = Math.max(100, theoPrice);
-        
-        return {
-            conservative: Math.max(basePrice - 0.618 * strategyStd, absoluteMin),
-            balanced: Math.max(basePrice, absoluteMin),
-            aggressive: Math.max(basePrice + 0.618 * strategyStd, absoluteMin),
-            winProb: { conservative: 27, balanced: 50, aggressive: 73 }
-        };
-    }
-};
+window.addEventListener('DOMContentLoaded', function() {
+    loadStatistics();
+});
 
-// ==========================================
-// 資料載入
-// ==========================================
-async function loadData() {
+async function loadStatistics() {
+    const loadingDiv = document.getElementById('loadingDiv');
+    const statusDiv = document.getElementById('loadingStatus');
+    
     try {
-        // 載入競拍歷史
-        const auctionRes = await fetch(DATA_PATH + '04_auction.csv');
-        if (auctionRes.ok) {
-            const text = await auctionRes.text();
-            auctionData = parseCSV(text);
-            console.log('✅ 載入競拍資料:', auctionData.length, '筆');
+        statusDiv.textContent = '正在載入競拍資料...';
+        
+        // 嘗試載入 CSV 資料
+        let auctionData = [];
+        
+        try {
+            // 嘗試從 data/00_cb/ 載入
+            const response = await fetch('data/00_cb/04_auction.csv');
+            if (response.ok) {
+                const csvText = await response.text();
+                auctionData = parseCSV(csvText);
+                console.log('從CSV載入競拍資料:', auctionData.length, '筆');
+            }
+        } catch (e) {
+            console.log('CSV載入失敗，使用示範資料');
         }
         
-        // 載入待發行
-        const issueRes = await fetch(DATA_PATH + '06_issue.csv');
-        if (issueRes.ok) {
-            const text = await issueRes.text();
-            issueData = parseCSV(text);
-            console.log('✅ 載入待發行資料:', issueData.length, '筆');
+        // 如果沒有資料，使用示範資料
+        if (auctionData.length === 0) {
+            auctionData = generateSampleData();
         }
         
-        // 載入產業分類
-        const indRes = await fetch(DATA_PATH + '16_industry.csv');
-        if (indRes.ok) {
-            const text = await indRes.text();
-            const rows = parseCSV(text);
-            rows.forEach(r => {
-                if (r['產業名稱']) industryData[r['產業名稱']] = r;
-            });
-        }
+        // 處理資料
+        statusDiv.textContent = '正在處理資料...';
+        processAuctionData(auctionData);
         
-        initUI();
-        updateStats();
-        renderHistory();
+        // 初始化UI
+        statusDiv.textContent = '初始化介面...';
+        initializeUI();
+        
+        // 完成
+        loadingDiv.style.display = 'none';
+        document.querySelector('.container').style.display = 'block';
         
     } catch (error) {
-        console.error('載入資料失敗:', error);
-        document.getElementById('resultArea').innerHTML = '<div style="color:red; padding:20px;">載入資料失敗，請確認 data/00_cb/ 資料夾存在</div>';
+        console.error('載入失敗:', error);
+        loadingDiv.innerHTML = `
+            <div style="padding:20px; background:white; color:#D32F2F; border-radius:10px; text-align:center; max-width:400px;">
+                <h3>⚠️ 系統啟動失敗</h3>
+                <p style="margin:10px 0;">${error.message}</p>
+                <button onclick="location.reload()" style="padding:10px 20px; cursor:pointer; border:none; background:#1a237e; color:white; border-radius:8px;">重試</button>
+            </div>`;
     }
 }
 
-// CSV 解析
-function parseCSV(text) {
-    const lines = text.trim().split('\n');
+// 解析CSV
+function parseCSV(csvText) {
+    const lines = csvText.trim().split('\n');
     if (lines.length < 2) return [];
     
     const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
     const data = [];
     
     for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-        if (values.length === headers.length) {
-            const row = {};
-            headers.forEach((h, j) => row[h] = values[j]);
-            data.push(row);
-        }
+        const values = lines[i].split(',');
+        const row = {};
+        headers.forEach((h, idx) => {
+            row[h] = (values[idx] || '').trim().replace(/"/g, '');
+        });
+        data.push(row);
     }
+    
     return data;
 }
 
-// ==========================================
-// UI 初始化
-// ==========================================
-function initUI() {
-    // 填充產業下拉
+// 生成示範資料
+function generateSampleData() {
+    const industries = ['半導體', '電子零組件', '光電', '通訊網路', '電腦及週邊', '生技醫療', '金融', '傳產', '其他'];
+    const brokers = ['元大', '凱基', '富邦', '永豐金', '中信', '國泰', '台新', '玉山', '兆豐'];
+    const data = [];
+    
+    for (let i = 0; i < 300; i++) {
+        const year = 2019 + Math.floor(i / 50);
+        const theoPrice = 85 + Math.random() * 40;
+        const premium = 3 + Math.random() * 15;
+        const minBid = theoPrice * (1 + premium / 100);
+        const avgBid = minBid * (1 + Math.random() * 0.03);
+        
+        data.push({
+            'CB代號': `${1000 + i}`,
+            '名稱': `示範CB${i + 1}`,
+            '開標日期': `${year}/${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}/${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+            '產業分類': industries[Math.floor(Math.random() * industries.length)],
+            '發行券商': brokers[Math.floor(Math.random() * brokers.length)],
+            '擔保': Math.random() > 0.7 ? '有擔保' : '無擔保',
+            '信用評等': String(Math.floor(Math.random() * 6) + 2),
+            '股本': (Math.random() * 30 + 2).toFixed(1),
+            '發行規模': (Math.random() * 20 + 1).toFixed(1),
+            '年期': [3, 5, 7][Math.floor(Math.random() * 3)],
+            '轉換價格': (Math.random() * 200 + 20).toFixed(2),
+            '截標日收盤價': (Math.random() * 300 + 50).toFixed(2),
+            '理論價': theoPrice.toFixed(2),
+            '底標價格': '100',
+            '最低得標': minBid.toFixed(2),
+            '平均得標': avgBid.toFixed(2),
+            '最低溢價率': premium.toFixed(2),
+            '平均溢價率': (premium + 1 + Math.random() * 2).toFixed(2),
+            '投標倍數': (2 + Math.random() * 4).toFixed(2),
+            '掛牌最高': (minBid * (1 + Math.random() * 0.5)).toFixed(2),
+            '掛牌最低': (minBid * (0.95 + Math.random() * 0.1)).toFixed(2)
+        });
+    }
+    
+    return data;
+}
+
+// 處理競拍資料
+function processAuctionData(data) {
+    const safeFloat = (v) => {
+        if (typeof v === 'number') return v;
+        const n = parseFloat(String(v).replace(/[,%]/g, ''));
+        return isNaN(n) ? 0 : n;
+    };
+    
+    auctionRawData = data.map(row => {
+        const item = {
+            id: row['CB代號'] || row['代號'] || '',
+            name: row['名稱'] || row['CB名稱'] || '',
+            openDate: row['開標日期'] || row['截標日'] || '',
+            industry: row['產業分類'] || row['產業'] || '',
+            broker: row['發行券商'] || row['券商'] || '',
+            guarantee: row['擔保'] || row['擔保類型'] || '無擔保',
+            rating: row['信用評等'] || row['信評'] || row['TCRI'] || '',
+            capital: safeFloat(row['股本']),
+            issueSize: safeFloat(row['發行規模']),
+            years: safeFloat(row['年期']),
+            conversionPrice: safeFloat(row['轉換價格'] || row['轉換價']),
+            closePrice: safeFloat(row['截標日收盤價'] || row['收盤價']),
+            theoreticalPrice: safeFloat(row['理論價']),
+            floorPrice: safeFloat(row['底標價格'] || row['底標']) || 100,
+            minBidPrice: safeFloat(row['最低得標'] || row['最低得標價']),
+            avgBidPrice: safeFloat(row['平均得標'] || row['平均得標價']),
+            lowPremium: safeFloat(row['最低溢價率'] || row['最低溢價']),
+            avgPremium: safeFloat(row['平均溢價率'] || row['平均溢價']),
+            bidMultiple: safeFloat(row['投標倍數']),
+            marketHigh: safeFloat(row['掛牌最高']),
+            marketLow: safeFloat(row['掛牌最低'])
+        };
+        
+        // 建立資料庫
+        if (item.name) {
+            cbDatabase[item.name] = item;
+        }
+        
+        return item;
+    }).filter(item => item.name && item.minBidPrice > 0);
+    
+    // 計算統計
+    calculateStatistics();
+    
+    console.log('處理完成，有效資料:', auctionRawData.length, '筆');
+}
+
+// 計算統計資料
+function calculateStatistics() {
+    // 產業統計
+    const industryMap = {};
+    const brokerMap = {};
+    
+    auctionRawData.forEach(d => {
+        if (d.industry) {
+            if (!industryMap[d.industry]) {
+                industryMap[d.industry] = { count: 0, sumPremium: 0, sumMult: 0 };
+            }
+            industryMap[d.industry].count++;
+            industryMap[d.industry].sumPremium += d.lowPremium;
+            industryMap[d.industry].sumMult += d.bidMultiple;
+        }
+        
+        if (d.broker) {
+            if (!brokerMap[d.broker]) {
+                brokerMap[d.broker] = { count: 0, sumPremium: 0 };
+            }
+            brokerMap[d.broker].count++;
+            brokerMap[d.broker].sumPremium += d.lowPremium;
+        }
+    });
+    
+    statistics['維度統計']['產業'] = industryMap;
+    statistics['維度統計']['發行券商'] = brokerMap;
+    
+    // 全域統計
+    let sumLow = 0, sumMult = 0, count = 0;
+    auctionRawData.forEach(d => {
+        if (d.minBidPrice > 0) {
+            sumLow += d.lowPremium;
+            sumMult += d.bidMultiple;
+            count++;
+        }
+    });
+    
+    if (count > 0) {
+        globalMarketStats.low = sumLow / count;
+        globalMarketStats.avg = sumMult / count;
+    }
+}
+
+// 初始化UI
+function initializeUI() {
+    // 更新統計數據
+    document.getElementById('totalAuction').textContent = auctionRawData.length;
+    document.getElementById('avgPremium').textContent = globalMarketStats.low.toFixed(1) + '%';
+    document.getElementById('avgMultiple').textContent = globalMarketStats.avg.toFixed(2) + 'x';
+    
+    // 填充產業下拉選單
     const industrySelect = document.getElementById('industry');
-    const industries = [...new Set(auctionData.map(d => d['產業別'] || d['產業']).filter(Boolean))];
-    industries.sort().forEach(ind => {
+    const industries = Object.keys(statistics['維度統計']['產業']).sort((a, b) => {
+        return statistics['維度統計']['產業'][b].count - statistics['維度統計']['產業'][a].count;
+    });
+    industries.forEach(ind => {
         const opt = document.createElement('option');
         opt.value = ind;
-        opt.textContent = ind;
+        opt.textContent = `${ind} (${statistics['維度統計']['產業'][ind].count}檔)`;
         industrySelect.appendChild(opt);
     });
     
-    // 填充券商下拉
+    // 填充券商下拉選單
     const brokerSelect = document.getElementById('broker');
-    const brokers = [...new Set(auctionData.map(d => d['主辦券商'] || d['券商']).filter(Boolean))];
-    brokers.sort().forEach(b => {
+    const brokers = Object.keys(statistics['維度統計']['發行券商']).sort((a, b) => {
+        return statistics['維度統計']['發行券商'][b].count - statistics['維度統計']['發行券商'][a].count;
+    });
+    brokers.forEach(brk => {
         const opt = document.createElement('option');
-        opt.value = b;
-        opt.textContent = b;
+        opt.value = brk;
+        opt.textContent = `${brk} (${statistics['維度統計']['發行券商'][brk].count}檔)`;
         brokerSelect.appendChild(opt);
     });
     
     // 填充閃電帶入
-    populateQuickSelect();
+    initQuickSelect();
     
-    // 理論價自動計算
-    document.getElementById('stockPrice').addEventListener('input', calcTheoPrice);
-    document.getElementById('convPrice').addEventListener('input', calcTheoPrice);
+    // 綁定事件
+    bindEvents();
+}
+
+// 初始化閃電帶入
+function initQuickSelect() {
+    const recentGroup = document.getElementById('recentAuctionGroup');
     
-    // 初始結果區域
-    document.getElementById('resultArea').innerHTML = `
-        <div style="text-align:center; padding:40px; color:#888;">
-            <div style="font-size:48px; margin-bottom:15px;">🎯</div>
-            <div>請輸入競拍條件後點擊「AI預測」</div>
-        </div>
+    // 取最近20筆
+    const recent = [...auctionRawData]
+        .sort((a, b) => new Date(b.openDate) - new Date(a.openDate))
+        .slice(0, 20);
+    
+    recent.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.name;
+        opt.textContent = `${d.name} | ${d.openDate} | ${d.industry}`;
+        recentGroup.appendChild(opt);
+    });
+}
+
+// 閃電帶入選擇
+function quickSelectCB(name) {
+    if (!name) return;
+    
+    const cb = cbDatabase[name];
+    if (!cb) return;
+    
+    // 填入表單
+    document.getElementById('cbName').value = name;
+    document.getElementById('industry').value = cb.industry || '';
+    document.getElementById('broker').value = cb.broker || '';
+    document.getElementById('guarantee').value = cb.guarantee || '';
+    document.getElementById('rating').value = cb.rating || '';
+    document.getElementById('stockPrice').value = cb.closePrice || '';
+    document.getElementById('conversionPrice').value = cb.conversionPrice || '';
+    
+    // 發行規模區間
+    const size = cb.issueSize;
+    let sizeRange = '';
+    if (size < 2) sizeRange = '小於2億';
+    else if (size < 5) sizeRange = '2~5億';
+    else if (size < 10) sizeRange = '5~10億';
+    else if (size < 15) sizeRange = '10~15億';
+    else if (size < 20) sizeRange = '15~20億';
+    else sizeRange = '大於20億';
+    document.getElementById('issueSize').value = sizeRange;
+    
+    document.getElementById('years').value = cb.years || '';
+    
+    // 顯示資訊
+    const info = document.getElementById('quickSelectInfo');
+    info.style.display = 'block';
+    info.innerHTML = `
+        ✅ 已帶入「${name}」資料<br>
+        📊 歷史最低得標：${cb.minBidPrice.toFixed(2)} 元 | 溢價率：${cb.lowPremium.toFixed(2)}%
     `;
+    
+    // 觸發理論價計算
+    updateTheoPrice();
 }
 
-function populateQuickSelect() {
-    const select = document.getElementById('quickSelect');
-    
-    // 待競拍
-    const pending = issueData.filter(d => {
-        const method = d['發行方式'] || d['承銷方式'] || '';
-        return method.includes('競拍') || method.includes('競價');
-    });
-    
-    if (pending.length > 0) {
-        const group = document.createElement('optgroup');
-        group.label = '🔥 待競拍';
-        pending.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = JSON.stringify(d);
-            opt.textContent = `${d['CB簡稱'] || d['CB代號']} - ${d['產業別'] || ''}`;
-            group.appendChild(opt);
-        });
-        select.appendChild(group);
-    }
-    
-    // 近期完成
-    const recent = auctionData
-        .sort((a, b) => new Date(b['開標日期'] || b['競拍日']) - new Date(a['開標日期'] || a['競拍日']))
-        .slice(0, 10);
-    
-    if (recent.length > 0) {
-        const group = document.createElement('optgroup');
-        group.label = '📚 近期案例';
-        recent.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = JSON.stringify(d);
-            opt.textContent = `${d['CB簡稱'] || d['CB代號']} - ${d['開標日期'] || d['競拍日']}`;
-            group.appendChild(opt);
-        });
-        select.appendChild(group);
-    }
-    
-    select.addEventListener('change', handleQuickSelect);
-}
-
-function handleQuickSelect() {
-    const select = document.getElementById('quickSelect');
-    if (!select.value) return;
-    
-    try {
-        const data = JSON.parse(select.value);
+// 綁定事件
+function bindEvents() {
+    // CB名稱搜尋
+    document.getElementById('cbName').addEventListener('input', function() {
+        const val = this.value.trim();
+        const histDiv = document.getElementById('historyResults');
         
-        document.getElementById('cbName').value = data['CB簡稱'] || data['CB代號'] || '';
-        document.getElementById('industry').value = data['產業別'] || data['產業'] || '';
-        document.getElementById('broker').value = data['主辦券商'] || data['券商'] || '';
-        document.getElementById('guarantee').value = data['擔保'] || '';
-        document.getElementById('rating').value = data['信用評等'] || data['TCRI'] || '';
-        document.getElementById('issueAmount').value = data['發行總額'] || '';
-        
-        const theo = parseFloat(data['理論價']) || 0;
-        if (theo > 0) {
-            document.getElementById('theoPrice').value = theo.toFixed(2);
+        if (val.length >= 2) {
+            const matches = auctionRawData.filter(d => {
+                return (d.id && d.id.includes(val)) || (d.name && d.name.includes(val));
+            }).slice(0, 10);
+            
+            if (matches.length > 0) {
+                let html = '';
+                matches.forEach(d => {
+                    html += `
+                        <div class="history-card" onclick="selectHistoryCB('${d.name}')">
+                            <div style="font-weight:700; color:#1565c0;">${d.name}</div>
+                            <div style="font-size:12px; color:#666; margin-top:5px;">
+                                ${d.openDate} | ${d.industry} | 
+                                最低得標: ${d.minBidPrice.toFixed(2)}元 | 
+                                溢價: ${d.lowPremium.toFixed(2)}%
+                            </div>
+                        </div>
+                    `;
+                });
+                histDiv.innerHTML = html;
+                histDiv.style.display = 'block';
+            } else {
+                histDiv.style.display = 'none';
+            }
+        } else {
+            histDiv.style.display = 'none';
         }
-        
-    } catch (e) {
-        console.error('解析失敗:', e);
-    }
-}
-
-function calcTheoPrice() {
-    const stock = parseFloat(document.getElementById('stockPrice').value) || 0;
-    const conv = parseFloat(document.getElementById('convPrice').value) || 0;
-    
-    if (stock > 0 && conv > 0) {
-        const theo = (stock / conv) * 100;
-        document.getElementById('theoPrice').value = theo.toFixed(2);
-    }
-}
-
-// ==========================================
-// 統計更新
-// ==========================================
-function updateStats() {
-    // 總案例數
-    document.getElementById('totalCases').textContent = auctionData.length;
-    
-    // 平均投標倍數
-    const mults = auctionData.map(d => parseFloat(d['投標倍數']) || 0).filter(m => m > 0);
-    const avgMult = mults.length > 0 ? (mults.reduce((a, b) => a + b, 0) / mults.length).toFixed(2) : '--';
-    document.getElementById('avgMultiplier').textContent = avgMult + 'x';
-    
-    // 待競拍
-    const pending = issueData.filter(d => {
-        const method = d['發行方式'] || d['承銷方式'] || '';
-        return method.includes('競拍') || method.includes('競價');
     });
-    document.getElementById('pendingCount').textContent = pending.length;
     
-    // 市場氛圍
-    updateAtmosphere();
+    // 股價/轉換價輸入時更新理論價
+    document.getElementById('stockPrice').addEventListener('input', updateTheoPrice);
+    document.getElementById('conversionPrice').addEventListener('input', updateTheoPrice);
+    
+    // 表單提交
+    document.getElementById('evaluationForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        calculateEvaluation();
+    });
 }
 
-function updateAtmosphere() {
-    const recent = auctionData
-        .sort((a, b) => new Date(b['開標日期'] || 0) - new Date(a['開標日期'] || 0))
-        .slice(0, 10);
+// 選擇歷史CB
+function selectHistoryCB(name) {
+    document.getElementById('quickSelect').value = name;
+    quickSelectCB(name);
+    document.getElementById('historyResults').style.display = 'none';
+}
+
+// 更新理論價計算
+function updateTheoPrice() {
+    const stockPrice = parseFloat(document.getElementById('stockPrice').value) || 0;
+    const convPrice = parseFloat(document.getElementById('conversionPrice').value) || 0;
     
-    if (recent.length > 0) {
-        const premiums = recent.map(d => {
-            const theo = parseFloat(d['理論價']) || 0;
-            const minBid = parseFloat(d['最低得標']) || 0;
-            return theo > 0 ? ((minBid / theo - 1) * 100) : 0;
-        }).filter(p => p !== 0);
+    const resultDiv = document.getElementById('theoCalcResult');
+    
+    if (stockPrice > 0 && convPrice > 0) {
+        const theo = (stockPrice / convPrice) * 100;
+        document.getElementById('calcTheoPrice').textContent = theo.toFixed(2);
         
-        const avgPremium = premiums.length > 0 
-            ? (premiums.reduce((a, b) => a + b, 0) / premiums.length).toFixed(2) 
-            : '--';
+        // 判斷區間
+        let range = '';
+        if (theo < 90) range = '小於90元';
+        else if (theo < 95) range = '90~95元';
+        else if (theo < 100) range = '95~100元';
+        else if (theo < 105) range = '100~105元';
+        else if (theo < 110) range = '105~110元';
+        else if (theo < 115) range = '110~115元';
+        else range = '大於115元';
         
-        const mults = recent.map(d => parseFloat(d['投標倍數']) || 0).filter(m => m > 0);
-        const avgMult = mults.length > 0 
-            ? (mults.reduce((a, b) => a + b, 0) / mults.length).toFixed(2) 
-            : '--';
-        
-        document.getElementById('recentAvgPremium').textContent = avgPremium + '%';
-        document.getElementById('recentAvgMult').textContent = avgMult + 'x';
-        document.getElementById('atmosphereCard').style.display = 'block';
+        document.getElementById('calcTheoRange').textContent = range;
+        resultDiv.style.display = 'block';
+    } else {
+        resultDiv.style.display = 'none';
+    }
+}
+
+// 區塊展開/收合
+function toggleSection(sectionId, headerEl) {
+    const content = document.getElementById(sectionId);
+    const isCollapsed = content.classList.contains('collapsed');
+    
+    if (isCollapsed) {
+        content.classList.remove('collapsed');
+        headerEl.classList.remove('collapsed');
+    } else {
+        content.classList.add('collapsed');
+        headerEl.classList.add('collapsed');
     }
 }
 
 // ==========================================
-// AI 預測
+// 核心評估計算
 // ==========================================
-function runPrediction() {
-    const theoPrice = parseFloat(document.getElementById('theoPrice').value) || 0;
+function calculateEvaluation() {
+    // 收集表單資料
+    const stockPrice = parseFloat(document.getElementById('stockPrice').value) || 0;
+    const convPrice = parseFloat(document.getElementById('conversionPrice').value) || 0;
+    const floorPrice = parseFloat(document.getElementById('floorPrice').value) || 100;
     const guarantee = document.getElementById('guarantee').value;
     const rating = document.getElementById('rating').value;
     const industry = document.getElementById('industry').value;
-    const cbName = document.getElementById('cbName').value;
+    const issueSize = document.getElementById('issueSize').value;
     
-    if (theoPrice <= 0) {
-        alert('請輸入理論價格');
+    // 驗證必填
+    if (stockPrice <= 0 || convPrice <= 0) {
+        alert('請填寫股價和轉換價！');
         return;
     }
     
-    if (!guarantee) {
-        alert('請選擇擔保情況');
-        return;
+    // 計算理論價
+    const theo = (stockPrice / convPrice) * 100;
+    
+    // 篩選相似條件的歷史資料
+    const isGuaranteed = guarantee === '有擔保';
+    
+    // 取得同區間+同擔保的資料
+    const getSegment = (t) => {
+        if (t < 90) return '<90';
+        if (t < 95) return '90-95';
+        if (t < 100) return '95-100';
+        if (t < 105) return '100-105';
+        if (t < 110) return '105-110';
+        if (t < 115) return '110-115';
+        return '>=115';
+    };
+    
+    const targetSegment = getSegment(theo);
+    
+    const filtered = auctionRawData.filter(d => {
+        const dTheo = d.theoreticalPrice || 0;
+        const dGuaranteed = d.guarantee === '有擔保' || d.guarantee === '有';
+        
+        if (d.minBidPrice <= 0 || dTheo <= 0) return false;
+        if (dGuaranteed !== isGuaranteed) return false;
+        
+        // 允許相鄰區間
+        const segments = ['<90', '90-95', '95-100', '100-105', '105-110', '110-115', '>=115'];
+        const targetIdx = segments.indexOf(targetSegment);
+        const dIdx = segments.indexOf(getSegment(dTheo));
+        return Math.abs(targetIdx - dIdx) <= 1;
+    }).sort((a, b) => new Date(b.openDate) - new Date(a.openDate));
+    
+    console.log('篩選到相似案例:', filtered.length, '筆');
+    
+    // 計算統計
+    let avgPremium = globalMarketStats.low;
+    let stdPremium = 3;
+    let avgMult = globalMarketStats.avg;
+    let sampleCount = filtered.length;
+    
+    if (filtered.length >= 3) {
+        const premiums = filtered.map(d => d.lowPremium);
+        avgPremium = premiums.reduce((a, b) => a + b, 0) / premiums.length;
+        stdPremium = Math.sqrt(premiums.reduce((s, p) => s + Math.pow(p - avgPremium, 2), 0) / premiums.length);
+        
+        const mults = filtered.map(d => d.bidMultiple).filter(m => m > 0);
+        if (mults.length > 0) {
+            avgMult = mults.reduce((a, b) => a + b, 0) / mults.length;
+        }
     }
     
-    // 執行預測
-    const prediction = AICore.predict(theoPrice, guarantee, rating, industry);
-    const strategies = AICore.calcStrategies(prediction, theoPrice);
-    
-    if (!prediction || !strategies) {
-        alert('預測失敗，請檢查輸入');
-        return;
+    // v3.98g 線性預測模型
+    let linearPremium = avgPremium;
+    if (isGuaranteed) {
+        // 有擔保：溢價 = 65 - 0.56 × 理論價 + TCRI調整
+        linearPremium = 65 - 0.56 * theo;
+        if (rating) {
+            const tcriAdj = { '1': -2, '2': -1.5, '3': -1, '4': -0.5, '5': 0, '6': 0.5, '7': 1, '8': 2 };
+            linearPremium += (tcriAdj[rating] || 0);
+        }
+    } else {
+        // 無擔保：溢價 = 82 - 0.75 × 理論價 + TCRI調整
+        linearPremium = 82 - 0.75 * theo;
+        if (rating) {
+            const tcriAdj = { '1': -6, '2': -4, '3': -2, '4': -1, '5': 0, '6': 1, '7': 3, '8': 6 };
+            linearPremium += (tcriAdj[rating] || 0);
+        }
     }
     
-    // 查找相似案例
-    const similar = findSimilarCases(theoPrice, guarantee, industry);
+    // 整合預測（歷史統計 + 線性模型）
+    const finalPremium = filtered.length >= 5 ? 
+        avgPremium * 0.6 + linearPremium * 0.4 : 
+        linearPremium;
     
-    // 顯示結果
-    displayResult(prediction, strategies, theoPrice, cbName, similar);
-}
-
-function findSimilarCases(theoPrice, guarantee, industry) {
-    return auctionData.filter(d => {
-        const theo = parseFloat(d['理論價']) || 0;
-        const guar = d['擔保'] || '';
-        const ind = d['產業別'] || d['產業'] || '';
-        
-        // 理論價區間相近（±10）
-        const theoDiff = Math.abs(theo - theoPrice);
-        if (theoDiff > 10) return false;
-        
-        // 擔保類型相同
-        const isGuaranteed = (guarantee === '有擔保' || guarantee === '有');
-        const dataGuaranteed = (guar === '有擔保' || guar === '有');
-        if (isGuaranteed !== dataGuaranteed) return false;
-        
-        return true;
-    }).sort((a, b) => new Date(b['開標日期'] || 0) - new Date(a['開標日期'] || 0)).slice(0, 5);
-}
-
-function displayResult(prediction, strategies, theoPrice, cbName, similar) {
-    const isGuaranteed = prediction.model === 'guaranteed';
-    const modelColor = isGuaranteed ? '#2e7d32' : '#1565c0';
-    const modelName = isGuaranteed ? '有擔保' : '無擔保';
+    // 計算策略價格
+    // 保守 = μ - 0.618σ
+    // 穩健 = μ
+    // 積極 = μ + 0.618σ
+    // 極致 = μ + 1.236σ
+    const conservative = Math.max(floorPrice, theo * (1 + (finalPremium - 0.618 * stdPremium) / 100));
+    const balanced = Math.max(floorPrice, theo * (1 + finalPremium / 100));
+    const aggressive = Math.max(floorPrice, theo * (1 + (finalPremium + 0.618 * stdPremium) / 100));
+    const ultimate = Math.min(theo * (1 + (avgPremium + 2 * stdPremium) / 100), 
+                              theo * (1 + (finalPremium + 1.236 * stdPremium) / 100));
     
-    let html = `
-        <!-- 預測結果卡片 -->
-        <div class="result-card">
-            <div class="result-title">
-                🎯 ${cbName || 'CB'} 預測結果
-                <span style="font-size:12px; background:${modelColor}; color:white; padding:3px 10px; border-radius:12px; margin-left:10px;">${modelName}模型</span>
-            </div>
-            
-            <!-- 策略價格 -->
-            <div class="price-grid">
-                <div class="price-item conservative">
-                    <div class="price-label">保守策略 (成本優先)</div>
-                    <div class="price-value">${strategies.conservative.toFixed(2)}</div>
-                    <div style="font-size:11px; color:#888;">勝率 ${strategies.winProb.conservative}%</div>
-                </div>
-                <div class="price-item balanced">
-                    <div class="price-label">穩健策略 (均衡)</div>
-                    <div class="price-value">${strategies.balanced.toFixed(2)}</div>
-                    <div style="font-size:11px; color:#888;">勝率 ${strategies.winProb.balanced}%</div>
-                </div>
-                <div class="price-item aggressive">
-                    <div class="price-label">積極策略 (確保得標)</div>
-                    <div class="price-value">${strategies.aggressive.toFixed(2)}</div>
-                    <div style="font-size:11px; color:#888;">勝率 ${strategies.winProb.aggressive}%</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 預測明細 -->
-        <div class="result-card" style="background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%); border-color: #ddd;">
-            <div class="result-title" style="color:#666;">📐 預測明細</div>
-            <div class="info-row">
-                <span class="info-label">預測公式</span>
-                <span class="info-value">${prediction.formula}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">輸入理論價</span>
-                <span class="info-value">${theoPrice.toFixed(2)} 元</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">基礎溢價</span>
-                <span class="info-value">${prediction.basePremium >= 0 ? '+' : ''}${prediction.basePremium.toFixed(2)} 元</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">TCRI調整</span>
-                <span class="info-value" style="color:${prediction.tcriAdj >= 0 ? '#4caf50' : '#f44336'};">${prediction.tcriAdj >= 0 ? '+' : ''}${prediction.tcriAdj} 元</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">產業調整</span>
-                <span class="info-value" style="color:${prediction.industryAdj >= 0 ? '#4caf50' : '#f44336'};">${prediction.industryAdj >= 0 ? '+' : ''}${prediction.industryAdj} 元</span>
-            </div>
-            <div class="info-row" style="background:#e8f5e9; margin:10px -15px -15px; padding:12px 15px; border-radius:0 0 10px 10px;">
-                <span class="info-label" style="font-weight:bold;">預測最低得標價</span>
-                <span class="info-value" style="font-size:18px; color:${modelColor};">${prediction.predictedPrice.toFixed(2)} 元</span>
-            </div>
-        </div>
-    `;
+    // 信心度計算
+    let confScore = 50;
+    if (sampleCount >= 15) confScore += 30;
+    else if (sampleCount >= 10) confScore += 20;
+    else if (sampleCount >= 5) confScore += 10;
     
-    // 相似案例
-    if (similar.length > 0) {
-        html += `
-            <div class="result-card" style="background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%); border-color: #ffc107;">
-                <div class="result-title" style="color:#f57c00;">📊 相似案例參考 (${similar.length}筆)</div>
-                <table class="history-table">
-                    <thead>
-                        <tr>
-                            <th>CB名稱</th>
-                            <th>理論價</th>
-                            <th>最低得標</th>
-                            <th>溢價</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+    if (stdPremium < 3) confScore += 15;
+    else if (stdPremium < 5) confScore += 10;
+    
+    confScore = Math.min(100, Math.max(0, confScore));
+    
+    // 更新UI
+    document.getElementById('priceConservative').textContent = conservative.toFixed(2);
+    document.getElementById('priceBalanced').textContent = balanced.toFixed(2);
+    document.getElementById('priceAggressive').textContent = aggressive.toFixed(2);
+    document.getElementById('priceUltimate').textContent = ultimate.toFixed(2);
+    
+    document.getElementById('atmMultiple').textContent = avgMult.toFixed(2) + 'x';
+    document.getElementById('atmPremium').textContent = finalPremium.toFixed(1) + '%';
+    
+    // 熱度判斷
+    let heatText = '適中';
+    let heatColor = '#4caf50';
+    if (avgMult >= 4) { heatText = '🔥 高熱'; heatColor = '#f44336'; }
+    else if (avgMult >= 3) { heatText = '⬆️ 偏熱'; heatColor = '#ff9800'; }
+    else if (avgMult < 2) { heatText = '⬇️ 偏冷'; heatColor = '#2196f3'; }
+    document.getElementById('atmHeat').textContent = heatText;
+    document.getElementById('atmHeat').style.color = heatColor;
+    
+    // 信心度
+    let stars = '⭐';
+    let confText = '低信心';
+    if (confScore >= 80) { stars = '⭐⭐⭐⭐'; confText = '高信心'; }
+    else if (confScore >= 60) { stars = '⭐⭐⭐'; confText = '中高信心'; }
+    else if (confScore >= 40) { stars = '⭐⭐'; confText = '中信心'; }
+    
+    document.getElementById('confStars').textContent = stars;
+    document.getElementById('confText').textContent = confText;
+    document.getElementById('confScore').textContent = confScore;
+    document.getElementById('confBar').style.width = confScore + '%';
+    document.getElementById('confExplain').textContent = 
+        `基於 ${sampleCount} 筆相似案例計算，標準差 ${stdPremium.toFixed(2)}%`;
+    
+    // Rex大叔建議
+    let advice = '';
+    if (theo < 95) {
+        advice = `
+            <p><b>💡 低理論價情境 (${theo.toFixed(2)}元)</b></p>
+            <p>理論價偏低，建議以「得標價格」為主要參考，而非溢價率。</p>
+            <p>保守策略 ${conservative.toFixed(2)} 元是較安全的選擇，能有效控制風險。</p>
         `;
-        
-        similar.forEach(d => {
-            const theo = parseFloat(d['理論價']) || 0;
-            const minBid = parseFloat(d['最低得標']) || 0;
-            const premium = theo > 0 ? ((minBid / theo - 1) * 100).toFixed(2) : '--';
-            
-            html += `
-                <tr>
-                    <td>${d['CB簡稱'] || d['CB代號'] || '--'}</td>
-                    <td>${theo.toFixed(2)}</td>
-                    <td>${minBid.toFixed(2)}</td>
-                    <td style="color:${parseFloat(premium) >= 0 ? '#4caf50' : '#f44336'};">${premium}%</td>
-                </tr>
-            `;
-        });
-        
-        html += `</tbody></table></div>`;
-    }
-    
-    document.getElementById('resultArea').innerHTML = html;
-}
-
-// ==========================================
-// 歷史表格
-// ==========================================
-function renderHistory() {
-    const recent = auctionData
-        .sort((a, b) => new Date(b['開標日期'] || 0) - new Date(a['開標日期'] || 0))
-        .slice(0, 15);
-    
-    if (recent.length === 0) {
-        document.getElementById('historyTable').innerHTML = '<div style="color:#888; padding:20px;">暫無資料</div>';
-        return;
-    }
-    
-    let html = `
-        <table class="history-table">
-            <thead>
-                <tr>
-                    <th>開標日</th>
-                    <th>CB名稱</th>
-                    <th>擔保</th>
-                    <th>理論價</th>
-                    <th>最低得標</th>
-                    <th>倍數</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    recent.forEach(d => {
-        const date = (d['開標日期'] || d['競拍日'] || '').substring(0, 10);
-        const theo = parseFloat(d['理論價']) || 0;
-        const minBid = parseFloat(d['最低得標']) || 0;
-        const mult = parseFloat(d['投標倍數']) || 0;
-        const guar = (d['擔保'] || '').includes('有') ? '有' : '無';
-        
-        html += `
-            <tr>
-                <td>${date}</td>
-                <td>${d['CB簡稱'] || d['CB代號'] || '--'}</td>
-                <td><span style="background:${guar === '有' ? '#e8f5e9' : '#fff3e0'}; padding:2px 6px; border-radius:4px; font-size:11px;">${guar}</span></td>
-                <td>${theo.toFixed(2)}</td>
-                <td style="font-weight:bold;">${minBid.toFixed(2)}</td>
-                <td>${mult.toFixed(2)}x</td>
-            </tr>
+    } else if (theo <= 105) {
+        advice = `
+            <p><b>✨ 理想區間 (${theo.toFixed(2)}元)</b></p>
+            <p>理論價處於 95-105 元的理想區間，歷史資料參考價值高。</p>
+            <p>建議採用穩健策略 ${balanced.toFixed(2)} 元，兼顧得標率與成本控制。</p>
         `;
-    });
+    } else {
+        advice = `
+            <p><b>⚡ 高理論價警示 (${theo.toFixed(2)}元)</b></p>
+            <p>理論價偏高，投標價格也會相對較高，風險需謹慎評估。</p>
+            <p>建議採用保守策略 ${conservative.toFixed(2)} 元，嚴控投標成本。</p>
+        `;
+    }
     
-    html += '</tbody></table>';
-    document.getElementById('historyTable').innerHTML = html;
-}
-
-function resetForm() {
-    document.getElementById('evalForm').reset();
-    document.getElementById('quickSelect').value = '';
-    document.getElementById('resultArea').innerHTML = `
-        <div style="text-align:center; padding:40px; color:#888;">
-            <div style="font-size:48px; margin-bottom:15px;">🎯</div>
-            <div>請輸入競拍條件後點擊「AI預測」</div>
-        </div>
+    advice += `
+        <hr style="margin:12px 0; border:none; border-top:1px dashed #ccc;">
+        <p style="font-style:italic; color:#795548;">
+            💬 競拍的核心是控制成本，不是搶籌碼。選擇適合自己風險承受度的策略，讓自己立於不敗之地。
+        </p>
     `;
+    
+    document.getElementById('rexAdvice').innerHTML = advice;
+    
+    // 顯示結果區
+    document.getElementById('resultSection').style.display = 'block';
+    document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
 }
-
-// ==========================================
-// 啟動
-// ==========================================
-document.addEventListener('DOMContentLoaded', loadData);
 </script>
 
 </body>

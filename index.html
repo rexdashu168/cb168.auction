@@ -8503,13 +8503,13 @@ function initializeUI() {
     populateSelect('broker', statistics['維度統計']['發行券商']);
     showStatsSummary();
     bindInputEvents();
-    generateSupplyAnalysis(); // v3.54 新增
-    generateYearlyRanking();  // v3.55 新增
-    generateRealPerformance(); // v3.56 新增
-    generateProfitLossAnalysis(); // v3.59 新增
+    // generateSupplyAnalysis(); // v4.00: 已移除（研究中心功能）
+    // generateYearlyRanking(); // v4.00: 已移除（研究中心功能）
+    // generateRealPerformance(); // v4.00: 已移除（研究中心功能）
+    // generateProfitLossAnalysis(); // v4.00: 已移除（研究中心功能）
     // v3.97-as-ce: 移除維度統計功能（generateDimensionAnalysis）
-    generateMarketTrendAnalysis(); // v3.58 新增
-    initPerformanceAnalysisData(); // v3.98f-13 新增：新績效分析模組
+    // generateMarketTrendAnalysis(); // v4.00: 已移除（研究中心功能）
+    // initPerformanceAnalysisData(); // v4.00: 已移除（研究中心功能）
     initQuickSelect(); // v3.73 修正：移到這裡確保資料已載入
     initSmartTips(); // v3.73 新增：智慧提示系統
     updateAtmospherePanel(); // v3.70 更新市場氛圍面板

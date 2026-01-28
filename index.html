@@ -8792,13 +8792,7 @@ function populateSelect(id, dataObj) {
     });
 }
 function showStatsSummary() {
-    // v3.98g：更新到頂部header的統計數據
-    const auctionCount = auctionRawData.filter(d=>d.minBidPrice>0).length;
-    const inquiryCount = inquiryRawData.length;
-    const listingCount = auctionRawData.filter(d=>d.marketHigh>0).length + inquiryRawData.filter(d=>d.marketHigh>0).length;
-    document.getElementById('headerAuctionCount').textContent = auctionCount;
-    document.getElementById('headerInquiryCount').textContent = inquiryCount;
-    document.getElementById('headerListingCount').textContent = listingCount;
+    // v4.00：精簡版 - 統計數據已整合到 headerSubtitle，此函數保留但不執行
 }
 // v3.54 新增：市場供給量分析
 // v3.72 修改：從hardcodedStats改為使用動態載入的halfYearStats

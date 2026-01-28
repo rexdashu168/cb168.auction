@@ -8503,13 +8503,13 @@ function initializeUI() {
     populateSelect('broker', statistics['維度統計']['發行券商']);
     showStatsSummary();
     bindInputEvents();
-    // generateSupplyAnalysis(); // v4.00: 已移除（研究中心功能）
-    // generateYearlyRanking(); // v4.00: 已移除（研究中心功能）
-    // generateRealPerformance(); // v4.00: 已移除（研究中心功能）
-    // generateProfitLossAnalysis(); // v4.00: 已移除（研究中心功能）
+    // generateSupplyAnalysis(); // v4.00: 已移除 // v3.54 新增
+    // generateYearlyRanking(); // v4.00: 已移除  // v3.55 新增
+    // generateRealPerformance(); // v4.00: 已移除 // v3.56 新增
+    // generateProfitLossAnalysis(); // v4.00: 已移除 // v3.59 新增
     // v3.97-as-ce: 移除維度統計功能（generateDimensionAnalysis）
-    // generateMarketTrendAnalysis(); // v4.00: 已移除（研究中心功能）
-    // initPerformanceAnalysisData(); // v4.00: 已移除（研究中心功能）
+    // generateMarketTrendAnalysis(); // v4.00: 已移除 // v3.58 新增
+    // initPerformanceAnalysisData(); // v4.00: 已移除 // v3.98f-13 新增：新績效分析模組
     initQuickSelect(); // v3.73 修正：移到這裡確保資料已載入
     initSmartTips(); // v3.73 新增：智慧提示系統
     updateAtmospherePanel(); // v3.70 更新市場氛圍面板
@@ -8939,7 +8939,7 @@ function generateSupplyAnalysis() {
 }
 // v3.92 新增：供給分析渲染函數（供標籤切換使用）
 function renderSupplyAnalysis() {
-    return generateSupplyAnalysis();
+    return // generateSupplyAnalysis(); // v4.00: 已移除
 }
 // v3.99U: 近期承銷分析（承銷進行中 / 董事會公告）
 function renderPipelineAnalysis() {
@@ -22008,6 +22008,425 @@ function getTheoPriceKey(theoPrice) {
     if (theoPrice < 110) return '105~110元';
     if (theoPrice < 115) return '110~115元';
     return '大於115元';
+}
+/**
+ * 根據基礎價格計算實際投標價格
+ * v3.72 修正：基礎價格 = max(底標, 理論價)
+ * @param {number} theoPrice - 理論價格
+ * @param {number} premium - 溢價%（相對於基礎價）
+ * @param {number} floorPrice - 底標價格
+ * @returns {number} 投標價格
+ */
+function calcMajorBidPrice(theoPrice, premium, floorPrice) {
+    // 基礎價 = max(理論價, 底標)
+    const basePrice = Math.max(theoPrice, floorPrice);
+    // 投標價 = 基礎價 × (1 + 溢價%)
+    const bidPrice = basePrice * (1 + premium / 100);
+    return Math.round(bidPrice * 100) / 100;
+}
+/**
+ * 生成主力模擬出價面板HTML
+ * v3.73 重寫：基於理論價的主力模擬
+ * @param {object} mpResult - 主力預測結果
+ * @param {number} floorPrice - 底標價格
+ * @param {number} theoPrice - 理論價格
+ * @returns {string} HTML字串
+ */
+function generateMajorPlayerHTML(mpResult, floorPrice, theoPrice, guarantee) {
+    if (!mpResult) return '';
+    const fp = parseFloat(floorPrice) || 100;
+    const tp = parseFloat(theoPrice) || mpResult.theoPrice || 100;
+    // v3.75：確保價格順序正確（保守 < 平衡 < 積極）
+    let rawPrices = [
+        { type: 'conservative', price: Math.max(mpResult.conservativePrice || fp, fp), premium: mpResult.conservativePremium || 0 },
+        { type: 'balanced', price: Math.max(mpResult.balancedPrice || fp, fp), premium: mpResult.balancedPremium || 0 },
+        { type: 'aggressive', price: Math.max(mpResult.aggressivePrice || fp, fp), premium: mpResult.aggressivePremium || 0 }
+    ].sort((a, b) => a.price - b.price);
+    // 排序後重新賦值：最低=保守，中間=平衡，最高=積極
+    const conservativePrice = rawPrices[0].price;
+    const conservativePremium = rawPrices[0].premium;
+    const balancedPrice = rawPrices[1].price;
+    const balancedPremium = rawPrices[1].premium;
+    const aggressivePrice = rawPrices[2].price;
+    const aggressivePremium = rawPrices[2].premium;
+    // 信心度樣式
+    const confClass = mpResult.confidence === '高' ? 'high' : (mpResult.confidence === '中' ? 'medium' : 'low');
+    const confIcon = mpResult.confidence === '高' ? '⭐⭐⭐' : (mpResult.confidence === '中' ? '⭐⭐' : '⭐');
+    // 熱度標籤顏色
+    const heatColor = mpResult.heatColor || '#eab308';
+    // 生成因子分析HTML
+    let factorHTML = '';
+    if (mpResult.adjustments && mpResult.adjustments.length > 0) {
+        factorHTML = mpResult.adjustments.map(adj => {
+            const valueColor = adj.value > 0.1 ? '#22c55e' : (adj.value < -0.1 ? '#ef4444' : '#666');
+            const sign = adj.value >= 0 ? '+' : '';
+            return `
+                <div style="display:flex; justify-content:space-between; padding:4px 8px; background:#f8fafc; border-radius:4px; margin-bottom:4px;">
+                    <span style="color:#444;">${adj.factor}：<b>${adj.label}</b></span>
+                    <span style="color:${valueColor}; font-weight:bold;">${sign}${adj.value.toFixed(2)}倍 <span style="color:#444; font-size:16px;">(參考${adj.ref?.toFixed(2) || '-'}x, n=${adj.count})</span></span>
+                </div>`;
+        }).join('');
+    }
+    const html = `
+    <div class="major-player-panel">
+        <div class="major-player-header">
+            🎯 v3.73 AI智能競拍預測
+            <span style="float:right; font-size:16px; font-weight:normal;">${mpResult.dataSource || '基於${totalAuctionCount}檔競拍統計'}</span>
+        </div>
+        <div class="major-player-content">
+            <!-- 投標倍數預估區塊（核心新功能） -->
+            <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:12px; padding:16px; margin-bottom:15px; color:white;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="font-size:16px; opacity:0.9;">📊 預估投標倍數</div>
+                    <div style="background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px; font-size:16px;">
+                        ${mpResult.multRange || '2-3倍'}
+                    </div>
+                </div>
+                <div style="display:flex; align-items:baseline; gap:8px;">
+                    <span style="font-size:42px; font-weight:bold;">${mpResult.estimatedMult?.toFixed(2) || '2.98'}</span>
+                    <span style="font-size:20px; opacity:0.8;">倍</span>
+                    <span style="background:${heatColor}; padding:3px 10px; border-radius:12px; font-size:16px; margin-left:10px;">
+                        ${mpResult.heatLevel || '一般'}
+                    </span>
+                </div>
+                <div style="font-size:16px; opacity:0.8; margin-top:8px;">
+                    合理區間：<b style="font-size:16px;">${mpResult.expectedMinBid?.toFixed(2) || '106.43'}</b> ~ <b style="font-size:16px;">${mpResult.expectedAvgBid?.toFixed(2) || '108.51'}</b> 元
+                    <span style="opacity:0.85;">（差距 ${mpResult.priceGap?.toFixed(2) || '2'}元）</span>
+                </div>
+            </div>
+            <!-- 因子分析明細 -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:15px;">
+                <div style="font-size:16px; font-weight:bold; color:#334155; margin-bottom:10px;">
+                    🔬 投標倍數預估因子分析
+                </div>
+                ${factorHTML || '<div style="color:#444; font-size:16px;">無可用因子數據</div>'}
+                <div style="border-top:1px solid #e2e8f0; margin-top:8px; padding-top:8px; font-size:16px; color:#64748b;">
+                    基準倍數 2.98（${totalAuctionCount}檔平均）→ 預估 <b style="color:#6366f1;">${mpResult.estimatedMult?.toFixed(2) || '2.98'}</b> 倍
+                </div>
+            </div>
+            <!-- 建議出價區塊（v3.75 重新設計）-->
+            <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:12px; margin-bottom:15px;">
+                <div style="font-size:16px; color:#166534; margin-bottom:8px;">
+                    <b>💰 建議出價區間</b>（基於 ${mpResult.multRange || '2-3倍'} 歷史數據，n=${mpResult.histSampleCount || '-'}）
+                </div>
+                <div style="display:flex; gap:20px; flex-wrap:wrap; font-size:16px; margin-bottom:10px;">
+                    <div>
+                        <span style="color:#444;">最低得標：</span>
+                        <b style="color:#b45309;">${mpResult.expectedMinBid?.toFixed(2) || '-'} 元</b>
+                    </div>
+                    <div>
+                        <span style="color:#444;">平均得標：</span>
+                        <b style="color:#16a34a;">${mpResult.expectedAvgBid?.toFixed(2) || '-'} 元</b>
+                    </div>
+                    <div>
+                        <span style="color:#444;">區間差距：</span>
+                        <b style="color:#7c3aed;">${mpResult.priceGap?.toFixed(2) || '-'} 元</b>
+                    </div>
+                </div>
+            </div>
+            <div class="major-player-main">
+                <div class="major-player-strategies" style="width:100%;">
+                    <div class="mp-strategy-grid">
+                        <div class="mp-strategy-card safe">
+                            <h5>🛡️ 保守型</h5>
+                            <div class="mp-price">${conservativePrice.toFixed(2)}</div>
+                            <div class="mp-rate">溢價 ${conservativePremium.toFixed(2)}%</div>
+                            <div class="mp-rate" style="color:#f59e0b; font-size:16px;">≈最低得標</div>
+                        </div>
+                        <div class="mp-strategy-card stable">
+                            <h5>⚖️ 平衡型</h5>
+                            <div class="mp-price">${balancedPrice.toFixed(2)}</div>
+                            <div class="mp-rate">溢價 ${balancedPremium.toFixed(2)}%</div>
+                            <div class="mp-rate" style="color:#3b82f6; font-size:16px;">最佳性價比</div>
+                        </div>
+                        <div class="mp-strategy-card sniper">
+                            <h5>🎯 積極型</h5>
+                            <div class="mp-price">${aggressivePrice.toFixed(2)}</div>
+                            <div class="mp-rate">溢價 ${aggressivePremium.toFixed(2)}%</div>
+                            <div class="mp-rate" style="color:#22c55e; font-size:16px;">≈平均得標</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mp-confidence-bar ${confClass}">
+                <span style="font-weight:bold;">預測信心度：${mpResult.confidence} ${confIcon}</span>
+                <span style="margin-left:15px; font-size:16px;">
+                    ${mpResult.confidence === '高' ? '多因子樣本充足，預測較可靠' :
+                      mpResult.confidence === '中' ? '部分因子樣本較少，可作參考' :
+                      '樣本不足，建議謹慎參考'}
+                </span>
+            </div>
+            <div style="background:#fef3c7; border-radius:8px; padding:12px; margin-top:12px;">
+                <div style="font-size:16px; font-weight:bold; color:#92400e; margin-bottom:8px;">💡 策略邏輯說明</div>
+                <ul style="margin:0; padding-left:18px; color:#78350f; font-size:16px; line-height:1.6;">
+                    <li><b>保守型</b> = 預期最低得標（門檻價，有機會得標但可能落標）</li>
+                    <li><b>平衡型</b> = (最低+平均)/2（最佳性價比，推薦）</li>
+                    <li><b>積極型</b> = 預期平均得標（穩定得標，成本較高）</li>
+                    <li>區間差距約 ${mpResult.priceGap?.toFixed(1) || '1.5-2'} 元，可作為動態學習參考</li>
+                </ul>
+            </div>
+        </div>
+    </div>`;
+    return html;
+}
+/**
+ * 更新得標機率計算器
+ * v3.72 修正：以理論價為基礎計算溢價，區分有擔保/無擔保
+ */
+function updateWinRateCalc(theoPrice, floorPrice, predictedPremium, guarantee) {
+    const bidPrice = parseFloat(document.getElementById('mpUserBidPrice').value) || floorPrice;
+    const basePrice = Math.max(theoPrice, floorPrice);
+    // 溢價是相對於基礎價計算的
+    const userPremium = ((bidPrice / basePrice) - 1) * 100;
+    const result = estimateWinRate(userPremium, predictedPremium);
+    const resultEl = document.getElementById('mpWinRateResult');
+    if (resultEl) {
+        resultEl.style.background = result.color;
+        resultEl.textContent = `預估機率: ${result.rate}`;
+    }
+    // 更新出價風險評估（區分有擔保/無擔保）
+    updateBidRiskAssessment(userPremium, theoPrice, guarantee || '無擔保');
+}
+/**
+ * 出價風險評估函數
+ * v3.72 修改：改用動態計算的統計數據
+ * 基於歷史CB競拍統計，區分有擔保/無擔保，計算用戶出價在歷史數據中的位置
+ * @param {number} userPremium - 用戶的溢價%
+ * @param {number} theoPrice - 理論價格
+ * @param {string} guarantee - 擔保類型（有擔保/無擔保）
+ */
+function updateBidRiskAssessment(userPremium, theoPrice, guarantee) {
+    // v3.72 使用動態計算的統計數據
+    const guaranteedStats = window.guaranteedStats || {};
+    const unguaranteedStats = window.unguaranteedStats || {};
+    // 判斷理論價區間
+    let theoKey = '>=110';
+    if (theoPrice < 95) theoKey = '<95';
+    else if (theoPrice < 100) theoKey = '95-100';
+    else if (theoPrice < 105) theoKey = '100-105';
+    else if (theoPrice < 110) theoKey = '105-110';
+    // 根據擔保類型選擇統計表
+    const isGuaranteed = guarantee === '有擔保';
+    const statsTable = isGuaranteed ? guaranteedStats : unguaranteedStats;
+    // 預設統計值（當沒有動態數據時使用）
+    const defaultStats = { mean: 5.0, std: 5.0, n: 0, p10: 0, p25: 1, p50: 5, p75: 9, p90: 12 };
+    const stats = statsTable[theoKey] || defaultStats;
+    const guarLabel = isGuaranteed ? '有擔保' : '無擔保';
+    // 計算Z-score（偏離均值幾個標準差）
+    const zScore = (userPremium - stats.mean) / stats.std;
+    const absZ = Math.abs(zScore);
+    // 計算百分位位置
+    let percentile = 50;
+    let riskLevel = '中等';
+    let riskColor = '#eab308';
+    let riskIcon = '⚖️';
+    let riskNote = '';
+    if (userPremium <= stats.p10) {
+        percentile = 10;
+        riskLevel = '極低';
+        riskColor = '#22c55e';
+        riskIcon = '✅';
+        riskNote = '出價位於歷史最低10%，得標機率較低但風險可控';
+    } else if (userPremium <= stats.p25) {
+        percentile = 25;
+        riskLevel = '偏低';
+        riskColor = '#84cc16';
+        riskIcon = '👍';
+        riskNote = '出價位於歷史25%分位，得標機率中低';
+    } else if (userPremium <= stats.p50) {
+        percentile = 50;
+        riskLevel = '中等偏低';
+        riskColor = '#eab308';
+        riskIcon = '⚖️';
+        riskNote = '出價接近歷史中位數，風險與機會均衡';
+    } else if (userPremium <= stats.p75) {
+        percentile = 75;
+        riskLevel = '中等偏高';
+        riskColor = '#f97316';
+        riskIcon = '⚠️';
+        riskNote = '出價高於75%的歷史案例，得標機率較高但風險增加';
+    } else if (userPremium <= stats.p90) {
+        percentile = 90;
+        riskLevel = '偏高';
+        riskColor = '#ef4444';
+        riskIcon = '🔺';
+        riskNote = '出價位於歷史前10%高位，風險較高';
+    } else {
+        percentile = 95;
+        riskLevel = '極高';
+        riskColor = '#dc2626';
+        riskIcon = '🚨';
+        riskNote = '出價超過90%的歷史案例！極高風險，請審慎評估';
+    }
+    // Z-score風險補充說明
+    let zScoreNote = '';
+    if (absZ > 2) {
+        zScoreNote = `<div style="background:#fef2f2; padding:6px 10px; border-radius:4px; margin-top:8px; font-size:16px; color:#dc2626;">
+            <strong>⚠️ 極端偏離警示：</strong>偏離均值 ${absZ.toFixed(1)} 個標準差（${zScore > 0 ? '高於' : '低於'}均值 ${Math.abs(userPremium - stats.mean).toFixed(1)}%）
+        </div>`;
+    } else if (absZ > 1.5) {
+        zScoreNote = `<div style="background:#fffbeb; padding:6px 10px; border-radius:4px; margin-top:8px; font-size:16px; color:#d97706;">
+            <strong>⚡ 注意：</strong>偏離均值 ${absZ.toFixed(1)} 個標準差，價格${zScore > 0 ? '偏高' : '偏低'}
+        </div>`;
+    }
+    // 更新UI
+    const riskEl = document.getElementById('mpRiskAssessment');
+    if (riskEl) {
+        riskEl.innerHTML = `
+            <div style="display:flex; align-items:flex-start; gap:10px;">
+                <span style="font-size:24px;">${riskIcon}</span>
+                <div style="flex:1;">
+                    <div style="font-weight:bold; color:${riskColor}; font-size:16px;">
+                        價格位置：${riskLevel}（第${percentile}百分位）
+                    </div>
+                    <div style="font-size:16px; color:#444; margin-top:4px;">
+                        ${riskNote}
+                    </div>
+                    <div style="font-size:16px; color:#555; margin-top:6px; padding:6px 0; border-top:1px solid #e5e7eb;">
+                        📊 同條件（${guarLabel}，${theoKey}，${stats.n}檔）：均值 ${stats.mean.toFixed(1)}% ± ${stats.std.toFixed(1)}%
+                        <br>
+                        📈 百分位：P25=${stats.p25.toFixed(1)}% | P50=${stats.p50.toFixed(1)}% | P75=${stats.p75.toFixed(1)}% | P90=${stats.p90.toFixed(1)}%
+                    </div>
+                    ${zScoreNote}
+                </div>
+            </div>
+        `;
+        riskEl.style.borderLeft = `4px solid ${riskColor}`;
+    }
+}
+/**
+ * 查找同類案件（用於統計顯示）
+ * 注意：這是舊版函數，用於生成同類案件統計HTML
+ * @param {Object} params - 查詢參數
+ * @returns {Object} 同類案件統計
+ */
+function findSimilarCasesForStats(params) {
+    const { theoreticalPrice, issueSize, industry } = params;
+    if (!auctionRawData || auctionRawData.length === 0) {
+        return { cases: [], stats: null };
+    }
+    // 定義理論價區間
+    let theoMin, theoMax;
+    if (theoreticalPrice >= 105) {
+        theoMin = 105; theoMax = 999;
+    } else if (theoreticalPrice >= 95) {
+        theoMin = 95; theoMax = 105;
+    } else if (theoreticalPrice >= 85) {
+        theoMin = 85; theoMax = 95;
+    } else {
+        theoMin = 0; theoMax = 85;
+    }
+    // 定義發行規模區間
+    let sizeMin, sizeMax;
+    if (issueSize < 5) {
+        sizeMin = 0; sizeMax = 5;
+    } else if (issueSize < 10) {
+        sizeMin = 5; sizeMax = 10;
+    } else if (issueSize < 15) {
+        sizeMin = 10; sizeMax = 15;
+    } else {
+        sizeMin = 15; sizeMax = 999;
+    }
+    // 篩選同類案件
+    let similarCases = auctionRawData.filter(d => {
+        const theo = d.theoreticalPrice || 0;
+        const size = d.issueSize || 0;
+        const matchTheo = theo >= theoMin && theo < theoMax;
+        const matchSize = size >= sizeMin && size < sizeMax;
+        return matchTheo && matchSize && d.avgPremium !== null && d.avgPremium !== undefined;
+    });
+    // 如果有產業條件，進一步篩選
+    let industryMatchCases = [];
+    if (industry) {
+        industryMatchCases = similarCases.filter(d => industryMatches(d.industry, industry));
+    }
+    // 計算統計數據
+    const calcStats = (cases) => {
+        if (cases.length === 0) return null;
+        const premiums = cases.map(d => d.avgPremium).filter(p => p !== null && !isNaN(p));
+        const multiples = cases.map(d => d.bidMultiple).filter(m => m > 0);
+        if (premiums.length === 0) return null;
+        const avgPremium = premiums.reduce((a, b) => a + b, 0) / premiums.length;
+        const minPremium = Math.min(...premiums);
+        const maxPremium = Math.max(...premiums);
+        // 計算標準差
+        const variance = premiums.reduce((sum, p) => sum + Math.pow(p - avgPremium, 2), 0) / premiums.length;
+        const stdDev = Math.sqrt(variance);
+        const avgMultiple = multiples.length > 0 ? multiples.reduce((a, b) => a + b, 0) / multiples.length : 0;
+        return {
+            count: cases.length,
+            avgPremium: avgPremium,
+            minPremium: minPremium,
+            maxPremium: maxPremium,
+            stdDev: stdDev,
+            avgMultiple: avgMultiple
+        };
+    };
+    return {
+        allCases: similarCases,
+        allStats: calcStats(similarCases),
+        industryCases: industryMatchCases,
+        industryStats: calcStats(industryMatchCases),
+        theoRange: `${theoMin}~${theoMax === 999 ? '∞' : theoMax}`,
+        sizeRange: `${sizeMin}~${sizeMax === 999 ? '∞' : sizeMax}億`
+    };
+}
+/**
+ * 更新市場氛圍面板
+ * v3.72 修改：根據用戶選擇的擔保類型篩選
+ */
+function updateAtmospherePanel() {
+    const panel = document.getElementById('atmospherePanel');
+    const content = document.getElementById('atmosphereContent');
+    if (!panel || !content) return;
+    // v3.72 新增：取得用戶選擇的擔保類型
+    const guaranteeEl = document.getElementById('guarantee');
+    const guarantee = guaranteeEl ? guaranteeEl.value : null;
+    const atmosphere = calcMarketAtmosphere(5, guarantee);
+    if (!atmosphere || atmosphere.caseCount === 0) {
+        panel.style.display = 'none';
+        return;
+    }
+    panel.style.display = 'block';
+    // v3.72 新增：標題加入擔保類型
+    const guarLabel = guarantee ? `【${guarantee}】` : '';
+    // 生成近期案例列表
+    let caseList = '';
+    atmosphere.recentCases.slice(0, 5).forEach((d, i) => {
+        // v3.73 修正：使用統一的 formatDate 函數處理日期
+        const dateStr = formatDate(d.openDate);
+        caseList += `
+        <div style="display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px dashed #c8e6c9; font-size: 16px;">
+            <span style="color: #444; min-width: 70px;">${dateStr}</span>
+            <span style="font-weight: 600; min-width: 80px;">${d.name || '-'}</span>
+            <span style="color: #1565c0;">溢${d.avgPremium !== null ? d.avgPremium.toFixed(2) : '-'}%</span>
+            <span style="color: #e65100;">${d.bidMultiple > 0 ? d.bidMultiple.toFixed(2) + 'x' : '-'}</span>
+        </div>`;
+    });
+    content.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+            <div style="flex: 1;">
+                <div style="font-size: 16px; color: #444;">近${atmosphere.caseCount}檔${guarLabel}平均溢價</div>
+                <div style="font-size: 22px; font-weight: bold; color: #2e7d32;">${atmosphere.avgPremium.toFixed(2)}%</div>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 16px; color: #444;">平均投標倍數</div>
+                <div style="font-size: 22px; font-weight: bold; color: #1565c0;">${atmosphere.avgMultiple.toFixed(2)}x</div>
+            </div>
+            <div style="flex: 0 0 auto;">
+                <div style="padding: 6px 12px; border-radius: 15px; background: ${atmosphere.levelColor}; color: white; font-weight: bold; font-size: 16px;">
+                    ${atmosphere.level}
+                </div>
+            </div>
+        </div>
+        <div style="background: #fff; padding: 8px; border-radius: 6px; margin-bottom: 8px;">
+            <div style="font-size: 16px; color: #444; margin-bottom: 5px;">📋 近期${guarLabel}開標案例</div>
+            ${caseList}
+        </div>
+        <div style="font-size: 16px; color: #2e7d32; background: #fff; padding: 8px; border-radius: 6px;">
+            💡 ${atmosphere.suggestion}
+        </div>
+    `;
 }
 
 // 系統啟動 (v4.00 競拍獨立版)

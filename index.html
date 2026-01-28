@@ -16978,7 +16978,9 @@ function calculateEvaluation(d) {
 function displayResult(r) {
     // v3.98h 新增：保存評估結果供切換加權/無加權時使用
     window.lastEvalResult = r;
-    document.getElementById('welcomeMsg').style.display = 'none';
+    // v4.00: welcomeMsg已移除，加入檢查
+    const welcomeMsg = document.getElementById('welcomeMsg');
+    if (welcomeMsg) welcomeMsg.style.display = 'none';
     // v3.99Q: 顯示CB標題（放在步驟報告前）
     const cbTitleHeader = document.getElementById('cbTitleHeader');
     if (cbTitleHeader) {
